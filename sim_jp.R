@@ -1,10 +1,7 @@
-rm(list=ls())
-
 library(circular)
 library(CircStats)
 library(splines2)
 library(numDeriv)
-
 library(parallel)
 library(doParallel)
 library(foreach)
@@ -16,12 +13,7 @@ l2 = function(v){
 
 #projected data
 x_pr = function(beta, x){
-  n = length(x[,1])
-  d = rep(0, n)
-  for(i in 1:n){
-    d[i]=t(beta/l2(beta))%*%x[i,]
-  }
-  return(d)
+  as.vector(x %*% (beta / l2(beta)))
 }
 
 beta = function(phi) c(1/sqrt(1+t(phi)%*%phi), as.numeric(1/sqrt(1+t(phi)%*%phi))*phi)
@@ -47,7 +39,6 @@ cdist = function(a, b){
 JPNCon = function(kappa, psi) {
   if (kappa < 0.001) {ncon = 1/(2*pi) ; return(ncon) }
   else {
-    #eps = 10*.Machine$double.eps
     eps=1e-6
     if (abs(psi) <= eps) { ncon = 1/(2*pi*I.0(kappa)) ; return(ncon) }
     else {
@@ -60,7 +51,6 @@ JPNCon = function(kappa, psi) {
 djp = function(theta, mu, kappa, psi, ncon) {
   if (kappa < 0.001) {pdfval = 1/(2*pi) ; return(pdfval)}
   else {
-    #eps = 10*.Machine$double.eps
     eps=1e-6
     if (abs(psi) <= eps) {
       pdfval = ncon*exp(kappa*cos(theta-mu)) ; return(pdfval) }
@@ -90,7 +80,7 @@ zijpnll = function(x, y, a, p, phi, gamma) {
   b = int_b(x_pr(beta(phi), x))
   mu = p[1] + 2*atan(as.vector(b %*% gamma))
   kappa = p[2] ; psi = p[3]
-  if (abs(kappa*psi) > 10) return(9999.0)
+  if (abs(kappa*psi) > 10) return(Inf)
   else { ncon = JPNCon(kappa, psi)
   return(-sum((1-a)*log(djp(y, mu, kappa, psi, ncon)))) }  
 }
@@ -98,11 +88,10 @@ zijpnll = function(x, y, a, p, phi, gamma) {
 
 E.zijp1 = function(x, y, phi, gamma, a, mu, kappa, psi){
   
-  if(abs(kappa*psi) > 10) return(9999)
+  if(abs(kappa*psi) > 10) return(Inf)
   
   b = int_b(x_pr(beta(phi), x))
   delta = y-mu-2*atan(as.vector(b %*% gamma))
-  #eps = 10*.Machine$double.eps
   eps = 1e-6
   if(abs(psi) <= eps){
     return(-sum((1-a) * cos(delta)))
@@ -117,7 +106,7 @@ loglik.zijp1 = function(theta, x, y){
   q = ncol(x)-1
   b = int_b(x_pr(beta(theta[5:(4+q)]), x))
   mu = theta[2]+2*atan(as.vector(b %*% theta[-c(1:(4+q))]))
-  if(abs(theta[3]*theta[4]) > 10) return(-9999.0)
+  if(abs(theta[3]*theta[4]) > 10) return(-Inf)
   else {
     ncon = JPNCon(theta[3], theta[4])
     sum(log(theta[1]*dvm(y, 0, 1000) + (1-theta[1])*djp(y, mu, theta[3], theta[4], ncon)))
@@ -158,9 +147,9 @@ lc.zijp1 = function(x, y, init, tol = 1e-3, max.iter = 200){
   }
   #return(theta.0)
   if (diff <= tol) {
-    return(theta.0)   # success: return estimate
+    return(theta.0)   
   } else {
-    return(NULL)      # fail: max.iter reached without convergence
+    return(NULL)      
   }
 }
 
@@ -219,14 +208,12 @@ r = foreach(j= 1:1050, .combine = rbind, .packages = c("circular","CircStats","s
   
   set.seed(j)
   n = 200
-  #x1 = runif(n, -1, 1)
   x1 = rnorm(n, 1, 2)
   x2 = runif(n, -1, 1)
   x = cbind(x1, x2)
   U = runif(n)
   y = rep(0, n)
   mu = mu0 + 2*atan(as.vector(2*(x %*% beta.0)^2))
-  #mu = mu0 + 2*atan((x1-x2)/sqrt(2))
   #mu = mu0 + 2*atan(as.vector(x %*% beta.0))
   for (i in 1:n){
     #mu[i] = mu0 + 2*atan(sin(5*x1[i])/2)
@@ -245,13 +232,6 @@ stopCluster(cl)
 t2 = Sys.time()
 t2 - t1
 
-nrow(r)
-
-
-#save(r, file="(jpsim1_lin)p=0.1,n=500,1-1050.Rdata")
-
-summary(unname(abs(r[,3]*r[,4])))
-mean(abs(r[,3]*r[,4]) > 9)
 
 apply(r, 2, mean)
 
