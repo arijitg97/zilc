@@ -158,8 +158,8 @@ lc.zijp1 = function(x, y, init, tol = 1e-3, max.iter = 200){
 ####### Simulation #######
 
 
-n.knots = 1
-d.f = n.knots + 3
+n.knots = 2
+d.f = n.knots + 2
 int_b = function(x, df = d.f, degree = 2) {
   ibs_x = ibs(x, df, degree = degree)
   ibs_0 = predict(ibs_x, 0)
@@ -184,12 +184,13 @@ lc.em = function(x, y, init){
 
 #true values
 p = 0.1
-mu0 = pi/4
-kappa = 2.5
-psi = 1.75
+mu0 = pi/5
+kappa = 2
+psi = -0.5
 ncon = JPNCon(kappa, psi)
+beta.0 = c(1, 0)                
 #beta.0 = c(1/sqrt(3), sqrt(2/3))
-beta.0 = c(1/2, sqrt(3)/2)
+#beta.0 = c(1/2, sqrt(3)/2)
 phi = beta.0[-1]/beta.0[1]
 
 m = 20
@@ -205,18 +206,18 @@ t1 = Sys.time()
 cl = makeCluster(ncores-1)
 registerDoParallel(cl)
 r = foreach(j= 1:1050, .combine = rbind, .packages = c("circular","CircStats","splines2"), .errorhandling = "remove") %dopar% {
-  
   set.seed(j)
   n = 200
-  x1 = rnorm(n, 1, 2)
-  x2 = runif(n, -1, 1)
+  x1 = rnorm(n, 0, 0.6)
+  x2 = runif(n, -1.1, 1.1)
   x = cbind(x1, x2)
   U = runif(n)
   y = rep(0, n)
-  mu = mu0 + 2*atan(as.vector(2*(x %*% beta.0)^2))
-  #mu = mu0 + 2*atan(as.vector(x %*% beta.0))
+  eta = as.vector(x %*% beta.0)
+  mu = mu0 + 2*atan(sin(5*eta)/2)
+  #mu = mu0 + 2*atan(2*eta^2)
+  #mu = mu0 + 2*atan(eta)
   for (i in 1:n){
-    #mu[i] = mu0 + 2*atan(sin(5*x1[i])/2)
     if(U[i]< p){
       y[i] = rvm(1, 0, 1000)
     }
