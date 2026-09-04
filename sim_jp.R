@@ -190,7 +190,7 @@ ncores = detectCores()
 t1 = Sys.time()
 cl = makeCluster(ncores-1)
 registerDoParallel(cl)
-r = foreach(j= 1:1050, .combine = rbind, .packages = c("circular","CircStats","splines2"), .errorhandling = "remove") %dopar% {
+res = foreach(j= 1:1050, .combine = rbind, .packages = c("circular","CircStats","splines2"), .errorhandling = "remove") %dopar% {
   # Data generation under ZIJP 1
   set.seed(j)
   n = 200
@@ -220,12 +220,86 @@ t2 = Sys.time()
 t2 - t1
 
 
-apply(r, 2, mean)
+del = 1001:nrow(res)
+res.1 = res[-del,]
+nrow(res.1)
+
+beta_hat = unname(t(sapply(res.1[,4], beta)))
+#beta_hat = unname(t(sapply(res.1[,5], beta)))
+
+res1 = cbind(res.1[,1:3], beta_hat, res.1[,-c(1:4)])
+#res1 = cbind(res.1[,1:4], beta_hat, res.1[,-c(1:5)])
+
+f_0 = function(t) sin(5*t)/2
+
+int1_b = function(x.new, x.ref, df = d.f, degree = 2){
+  ibs_ref = ibs(x.ref, df = df, degree = degree)
+  ibs_new = predict(ibs_ref, x.new)
+  ibs_0   = predict(ibs_ref, 0)
+  sweep(ibs_new, 2, ibs_0, "-")
+}
+
+N = 100
+t = seq(-1, 1, length = N)
+
+ncores = detectCores()
+cl = makeCluster(ncores - 1)
+registerDoParallel(cl)
+X1 = foreach(k = 1:nrow(res1), .combine = rbind, .packages = "splines2") %dopar% {
+
+  ## regenerate training covariates
+  set.seed(k)
+  n = 200
+  x1 = rnorm(n, 0, 0.6)
+  x2 = runif(n, -1.1, 1.1)
+  x  = cbind(x1, x2)
+
+  ## estimated beta
+  b = res1[k, 4:5]
+  #b = res1[k, 5:6]
+
+  ## projected training values
+  eta = x_pr(b, x)
+
+  ## evaluate fitted basis on common grid
+  B = int1_b(t, eta)
+
+  ## estimated spline coefficients
+  g = res1[k, -c(1:5)]
+  #g = res1[k, -c(1:6)]
+
+  ## fitted function
+  hhat = as.vector(B %*% g)
+  
+  mu.true = (mu0 + 2 * atan(f_0(t))) %% (2*pi)
+  mu.hat  = (res1[k,2] + 2 * atan(hhat)) %% (2*pi)
+  mspe = mean(1 - cos(mu.hat - mu.true))
+  c(mspe, hhat)
+}
+
+stopCluster(cl)
+dim(X1)
 
 
+cMSPE = mean(X1[,1])
 
+mean.fun = colMeans(X1[,-1])
+par(mar = c(5, 4.5, 4, 2) + 0.1)
+plot(t, mean.fun, type = "l",xlab = expression(hat(beta)^T*x), ylab = expression(bar(h)(hat(beta)^T*x)), lwd=2, ylim=c(-0.83,1.03))
+curve(f_0, add = T, col = "red", lwd = 2)
+lower = apply(X1[, -1], 2, quantile, probs = 0.025)
+upper = apply(X1[, -1], 2, quantile, probs = 0.975)
+lines(t, lower, lty = 2)
+lines(t, upper, lty = 2)
 
-
+est = data.frame(cbind(apply(res1[,c(1:5)], 2, mean), apply(res1[,c(1:5)], 2, sd)))
+#est = data.frame(cbind(apply(res1[,c(1:6)], 2, mean), apply(res1[,c(1:6)], 2, sd)))
+est[2,] = c(circ.mean(res1[,2]), sd.circular(res1[,2]))
+colnames(est) = c("Estimate", "Std. Error")
+rownames(est)[1:3] = c("p", "mu", "kappa")
+#rownames(est)[1:4] = c("p", "mu", "kappa", "psi")
+round(est, 4)
+round(cMSPE, 4)
 
 
 
