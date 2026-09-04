@@ -154,7 +154,7 @@ int_b = function(x, df = d.f, degree = 2) {
 }
 
 # Function returning estimates under the ZIJP 1 model given multiple random initial values
-lc.em = function(x, y, init){
+zijp1.em = function(x, y, init){
   M = nrow(init)
   theta.em = matrix(0, nrow = M, ncol = 9)
   ll = rep(0, M)
@@ -166,7 +166,7 @@ lc.em = function(x, y, init){
   return(theta_hat)
 }  
 
-# True values for simulation study
+# True values of parameters
 p = 0.1
 mu0 = pi/5
 kappa = 2
@@ -183,6 +183,7 @@ gamma.init = matrix(0, nrow = m, ncol = d.f)
 for(i in 1:m){
   gamma.init[i,] = rnorm(d.f, 0, 0.3)
 }
+# Initial values for all parameters                
 init1 = cbind(p, mu0, kappa, psi, phi, gamma.init)
 
 # Parallel computation of estimates over multiple replications under ZIJP 1 
@@ -213,17 +214,18 @@ res = foreach(j= 1:1050, .combine = rbind, .packages = c("circular","CircStats",
     }
   }
   
-  lc.em(x, y, init1)
+  zijp1.em(x, y, init1)
 }
 stopCluster(cl)
 t2 = Sys.time()
 t2 - t1
 
-del = 1001:nrow(res)
+del = 1001:nrow(res)         # Considering 1000 replications
 res.1 = res[-del,]
 beta_hat = unname(t(sapply(res.1[,5], beta)))
 res1 = cbind(res.1[,1:4], beta_hat, res.1[,-c(1:5)])
-f_0 = function(t) sin(5*t)/2
+
+f_0 = function(t) sin(5*t)/2  # True single-index function
 
 int1_b = function(x.new, x.ref, df = d.f, degree = 2){
   ibs_ref = ibs(x.ref, df = df, degree = degree)
@@ -270,8 +272,9 @@ X1 = foreach(k = 1:nrow(res1), .combine = rbind, .packages = "splines2") %dopar%
 }
 stopCluster(cl)
 
-cMSPE = mean(X1[,1])  # Average Circular MSPE
+cMSPE = mean(X1[,1])  # Average circular MSPE
 
+# Plotting the average estimated single-index function with 95% pointwise confidence interval
 mean.fun = colMeans(X1[,-1])
 par(mar = c(5, 4.5, 4, 2) + 0.1)
 plot(t, mean.fun, type = "l",xlab = expression(hat(beta)^T*x), ylab = expression(bar(h)(hat(beta)^T*x)), lwd=2, ylim=c(-0.83,1.03))
@@ -281,6 +284,7 @@ upper = apply(X1[, -1], 2, quantile, probs = 0.975)
 lines(t, lower, lty = 2)
 lines(t, upper, lty = 2)
 
+# Parameter estimates (with their standard deviations) and average circular MSPE
 est = data.frame(cbind(apply(res1[,c(1:6)], 2, mean), apply(res1[,c(1:6)], 2, sd)))
 est[2,] = c(circ.mean(res1[,2]), sd.circular(res1[,2]))
 colnames(est) = c("Estimate", "Std. Error")
