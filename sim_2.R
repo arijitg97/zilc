@@ -255,6 +255,8 @@ ncon = JPNCon(kappa, psi)
 beta.0 = c(1, 1)/sqrt(2)
 phi = beta.0[-1]/beta.0[1]
 
+f0 = function(x) 1/(1+ exp(-3*(x - 0.2)))
+f_0 = function(x) f0(x)-f0(0)             # True single-index function
 
 # Random initial values for spline coefficients
 m = 20
@@ -273,10 +275,7 @@ res = foreach(j= 1:510, .combine = rbind, .packages = c("circular","CircStats","
   x = cbind(x1, x2)
   U = runif(n)
   y = rep(0, n)
-  eta = as.vector(x %*% beta.0)
-  mu = mu0 + 2*atan(sin(5*eta)/2)
-  #mu = mu0 + 2*atan(2*eta^2)
-  #mu = mu0 + 2*atan(eta)
+  mu = mu0 + 2*atan(as.vector(f_0(x %*% beta.0)))
   for (i in 1:n){
     if(U[i]< p){
       y[i] = rvm(1, 0, 1000)
@@ -287,9 +286,9 @@ res = foreach(j= 1:510, .combine = rbind, .packages = c("circular","CircStats","
   }
   gamma.init = matrix(rnorm(m * d.f, 0, 0.3), m, d.f)
   init1 = cbind(delta0, delta1, delta2, mu0, kappa, psi, phi, gamma.init)
-  zijp2.em(x, z, y, init1)
+  zijp2.em(x, z, y, init1)   # ZIJP 2 fit
   #init2 = cbind(delta0, delta1, delta2, mu0, kappa, phi, gamma.init)
-  #zivm2.em(x, z, y, init2)
+  #zivm2.em(x, z, y, init2)  # ZIvM 2 fit
 }
 stopCluster(cl)
 t2 = Sys.time()
@@ -301,9 +300,6 @@ beta_hat = unname(t(sapply(res.1[,7], beta)))         # ZIJP 2
 res1 = cbind(res.1[,1:6], beta_hat, res.1[,-c(1:7)])  # ZIJP 2
 #beta_hat = unname(t(sapply(res.1[,6], beta)))         # ZIvM 2
 #res1 = cbind(res.1[,1:5], beta_hat, res.1[,-c(1:6)])  # ZIvM 2
-
-f0 = function(x) 1/(1+ exp(-3*(x - 0.2)))
-f_0 = function(x) f0(x)-f0(0) # True single-index function
 
 int1_b = function(x.new, x.ref, df = d.f, degree = 2){
   ibs_ref = ibs(x.ref, df = df, degree = degree)
