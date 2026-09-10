@@ -35,8 +35,8 @@ cdist = function(a, b){
 
 ########## ZIvM 1 ###########
 
-# Objective function for updating (phi,gamma) in ZIvM 1 model
-E.zivm1 = function(x, y, phi, gamma, a, mu){
+# Objective function for updating (phi,gamma) in ZIvM models
+E.zivm = function(x, y, phi, gamma, a, mu){
   b = int_b(x_pr(beta(phi), x))
   delta = y-mu-2*atan(as.vector(b %*% gamma))
   return(-sum((1-a) * cos(delta)))
@@ -144,8 +144,8 @@ zijpnll = function(x, y, a, p, phi, gamma) {
   return(-sum((1-a)*log(djp(y, mu, kappa, psi, ncon)))) }  
 }
 
-# Objective function for updating (phi,gamma) in ZIJP 1 model
-E.zijp1 = function(x, y, phi, gamma, a, mu, kappa, psi){
+# Objective function for updating (phi,gamma) in ZIJP models
+E.zijp = function(x, y, phi, gamma, a, mu, kappa, psi){
   if(abs(kappa*psi) > 10) return(Inf)
   b = int_b(x_pr(beta(phi), x))
   delta = y-mu-2*atan(as.vector(b %*% gamma))
