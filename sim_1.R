@@ -221,7 +221,7 @@ zijp1.em = function(x, y, init){
 ####### Simulation #######
 
 
-n.knots = 2               # Number of interior knots
+n.knots = 3               # Number of interior knots
 d.f = n.knots + 2         # Degrees of freedom in the spline function
 
 # Integrated B-spline basis function               
