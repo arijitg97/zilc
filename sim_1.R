@@ -242,14 +242,7 @@ beta.0 = c(1, 0)
 #beta.0 = c(1/sqrt(3), sqrt(2/3))
 phi = beta.0[-1]/beta.0[1]
 
-# Random initial values for spline coefficients
-m = 20
-gamma.init = matrix(0, nrow = m, ncol = d.f)
-for(i in 1:m){
-  gamma.init[i,] = rnorm(d.f, 0, 0.3)
-}
-# Initial values for all parameters                
-init1 = cbind(p, mu0, kappa, psi, phi, gamma.init)
+m = 20  # Number of random initial values for spline coefficients
 
 # Parallel computation of estimates over multiple replications under ZIJP 1 
 ncores = detectCores()
@@ -277,9 +270,11 @@ res = foreach(j= 1:1050, .combine = rbind, .packages = c("circular","CircStats",
       y[i] = jpsim(1, mu[i], kappa, psi, ncon)
     }
   }
-  
-  zijp1.em(x, y, init1)
-  #zivm1.em(x, y, init1)
+  gamma.init = matrix(rnorm(m * d.f, 0, 0.3), m, d.f)
+  init1 = cbind(p, mu0, kappa, psi, phi, gamma.init)  # Initial values for ZIJP 1
+  zijp1.em(x, y, init1)                               # ZIJP 1 fit
+  #init2 = cbind(p, mu0, kappa, phi, gamma.init)  # Initial values for ZIvM 1
+  #zivm1.em(x, y, init2)                          # ZIvM 1 fit
 }
 stopCluster(cl)
 t2 = Sys.time()
