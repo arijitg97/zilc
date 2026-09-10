@@ -282,8 +282,10 @@ t2 - t1
 
 del = 1001:nrow(res)         # Considering 1000 replications
 res.1 = res[-del,]
-beta_hat = unname(t(sapply(res.1[,5], beta)))
-res1 = cbind(res.1[,1:4], beta_hat, res.1[,-c(1:5)])
+beta_hat = unname(t(sapply(res.1[,5], beta)))           # ZIJP 1
+res1 = cbind(res.1[,1:4], beta_hat, res.1[,-c(1:5)])    # ZIJP 1
+#beta_hat = unname(t(sapply(res.1[,4], beta)))           # ZIvM 1
+#res1 = cbind(res.1[,1:3], beta_hat, res.1[,-c(1:4)])    # ZIvM 1
 
 f_0 = function(t) sin(5*t)/2  # True single-index function
 
