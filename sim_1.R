@@ -33,8 +33,69 @@ cdist = function(a, b){
 }
 
 
+########## ZIvM 1 ###########
 
-##########################################
+# Objective function for updating (phi,gamma) in ZIvM 1 model
+E.zivm1 = function(x, y, phi, gamma, a, mu){
+  b = int_b(x_pr(beta(phi), x))
+  delta = y-mu-2*atan(as.vector(b %*% gamma))
+  return(-sum((1-a) * cos(delta)))
+}
+
+# Log-likelihood for ZIvM 1 model
+loglik.zivm1 = function(theta, x, y){
+  q = ncol(x)-1
+  b = int_b(x_pr(beta(theta[4:(3+q)]), x))
+  mu = theta[2]+2*atan(as.vector(b %*% theta[-c(1:(3+q))]))
+  sum(log(theta[1]*dvm(y, 0, 1000) + (1-theta[1])*dvm(y, mu, theta[3]) ))
+}
+
+# Function returning estimates under the ZIvM 1 model
+lc.zivm1 = function(x, y, init, tol = 1e-3, max.iter = 200){
+  theta.0 = init
+  diff = 1
+  iter = 0
+  q = ncol(x)-1
+  while(diff > tol && iter < max.iter){
+    theta.1 = theta.0
+    b = int_b(x_pr(beta(theta.0[4:(3+q)]), x))
+    mu = theta.0[2]+2*atan(as.vector(b %*% theta.0[-c(1:(3+q))]))
+    a = (theta.0[1]*dvm(y,0,1000))/(theta.0[1]*dvm(y,0,1000)+(1-theta.0[1])*dvm(y,mu,theta.0[3]))
+    gamma_new = optim(theta.0[-c(1:(3+q))], function(gamma)E.zivm1(x, y, theta.0[4:(3+q)], gamma, a, theta.0[2]), method = "BFGS", control=list(maxit=2000))$par
+    phi_new = optim(theta.0[4:(3+q)], function(phi)E.zivm1(x, y, phi, gamma_new, a, theta.0[2]), method = "BFGS", control=list(maxit=2000))$par
+    p_new = mean(a)
+    b = int_b(x_pr(beta(phi_new), x))
+    del = y-2*atan(as.vector(b %*% gamma_new))
+    C = weighted.mean(cos(del), 1-a)
+    D = weighted.mean(sin(del), 1-a)
+    mu_new = atan2(D, C) 
+    kappa_new = A1inv(sqrt(C^2 + D^2))
+    theta.0 = c(p_new, mu_new, kappa_new, phi_new, gamma_new)
+    diff = l2(theta.0 - theta.1)
+    iter = iter + 1
+    }
+  if (diff <= tol) {
+    return(theta.0)  
+  } else {
+    return(NULL)      
+  }
+}
+
+# Function returning estimates under the ZIvM 1 model given multiple random initial values                    
+zivm1.em = function(x, y, init){
+  M = nrow(init)
+  theta.em = matrix(0, nrow = M, ncol = ncol(init))
+  ll = rep(0, M)
+  for(i in 1:M){
+    theta.em[i,] = lc.zivm1(x, y, init[i,])
+    ll[i] = loglik.zivm1(theta.em[i,], x, y)
+  }
+  theta_hat = theta.em[which.max(ll),]
+  return(theta_hat)
+}                     
+
+
+########## ZIJP 1 #############
 
 
 # Normalizing constant of Jones-Pewsey distribution
@@ -128,10 +189,8 @@ lc.zijp1 = function(x, y, init, tol = 1e-3, max.iter = 200){
     p_new = mean(a)
     theta.0 = c(p_new, mu_new, kappa_new, psi_new, phi_new, gamma_new)
     diff = l2(theta.0 - theta.1)
-    #diff = l2(theta.0[-c(1:3)] - theta.1[-c(1:3)])
     iter = iter + 1
   }
-  #return(theta.0)
   if (diff <= tol) {
     return(theta.0)   
   } else {
@@ -139,6 +198,25 @@ lc.zijp1 = function(x, y, init, tol = 1e-3, max.iter = 200){
   }
 }
 
+# Function returning estimates under the ZIJP 1 model given multiple random initial values
+zijp1.em = function(x, y, init){
+  M = nrow(init)
+  theta.list = vector("list", M)
+  ll = rep(-Inf, M)
+  for(i in 1:M){
+    fit = lc.zijp1(x, y, init[i,])
+    if(!is.null(fit)){
+      theta.list[[i]] = fit
+      ll[i] = loglik.zijp1(fit, x, y)
+    }
+  }
+  if(all(is.infinite(ll))){
+    stop("No initial value converged")
+  }
+  theta_hat = theta.list[[which.max(ll)]]
+  return(theta_hat)
+}
+                
 
 ####### Simulation #######
 
@@ -152,19 +230,6 @@ int_b = function(x, df = d.f, degree = 2) {
   ibs_0 = predict(ibs_x, 0)
   sweep(ibs_x, 2, ibs_0, "-")
 }
-
-# Function returning estimates under the ZIJP 1 model given multiple random initial values
-zijp1.em = function(x, y, init){
-  M = nrow(init)
-  theta.em = matrix(0, nrow = M, ncol = 9)
-  ll = rep(0, M)
-  for(i in 1:M){
-    theta.em[i,] = lc.zijp1(x, y, init[i,])
-    ll[i] = loglik.zijp1(theta.em[i,], x, y)
-  }
-  theta_hat = theta.em[which.max(ll),]
-  return(theta_hat)
-}  
 
 # True values of parameters
 p = 0.1
@@ -209,12 +274,12 @@ res = foreach(j= 1:1050, .combine = rbind, .packages = c("circular","CircStats",
       y[i] = rvm(1, 0, 1000)
     }
     else{
-      #y[i] = rvm(1, mu[i], kappa)
       y[i] = jpsim(1, mu[i], kappa, psi, ncon)
     }
   }
   
   zijp1.em(x, y, init1)
+  #zivm1.em(x, y, init1)
 }
 stopCluster(cl)
 t2 = Sys.time()
@@ -251,7 +316,8 @@ X1 = foreach(k = 1:nrow(res1), .combine = rbind, .packages = "splines2") %dopar%
   x  = cbind(x1, x2)
 
   ## estimated beta
-  b = res1[k, 5:6]
+  b = res1[k, 5:6]  # ZIJP 1
+  #b = res1[k, 4:5]  # ZIvM 1
 
   ## projected training values
   eta = x_pr(b, x)
@@ -260,7 +326,8 @@ X1 = foreach(k = 1:nrow(res1), .combine = rbind, .packages = "splines2") %dopar%
   B = int1_b(t, eta)
   
   ## estimated spline coefficients
-  g = res1[k, -c(1:6)]
+  g = res1[k, -c(1:6)]  # ZIJP 1
+  #g = res1[k, -c(1:5)]  # ZIvM 1
 
   ## fitted function
   hhat = as.vector(B %*% g)
@@ -285,10 +352,12 @@ lines(t, lower, lty = 2)
 lines(t, upper, lty = 2)
 
 # Parameter estimates (with their standard deviations) and average circular MSPE
-est = data.frame(cbind(apply(res1[,c(1:6)], 2, mean), apply(res1[,c(1:6)], 2, sd)))
+est = data.frame(cbind(apply(res1[,c(1:6)], 2, mean), apply(res1[,c(1:6)], 2, sd)))   # ZIJP 1
+#est = data.frame(cbind(apply(res1[,c(1:5)], 2, mean), apply(res1[,c(1:5)], 2, sd)))   # ZIvM 1
 est[2,] = c(circ.mean(res1[,2]), sd.circular(res1[,2]))
 colnames(est) = c("Estimate", "Std. Error")
-rownames(est)[1:4] = c("p", "mu", "kappa", "psi")
+rownames(est)[1:4] = c("p", "mu", "kappa", "psi")  # ZIJP 1
+#rownames(est)[1:3] = c("p", "mu", "kappa")         # ZIvM 1
 round(est, 4)
 round(cMSPE, 4)
 
