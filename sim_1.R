@@ -242,6 +242,10 @@ beta.0 = c(1, 0)
 #beta.0 = c(1/sqrt(3), sqrt(2/3))
 phi = beta.0[-1]/beta.0[1]
 
+f_0 = function(t) sin(5*t)/2  # True single-index function
+#f_0 = function(t) 2*t^2
+#f_0 = function(t) t
+                
 m = 20  # Number of random initial values for spline coefficients
 
 # Parallel computation of estimates over multiple replications under ZIJP 1 
@@ -258,10 +262,7 @@ res = foreach(j= 1:1050, .combine = rbind, .packages = c("circular","CircStats",
   x = cbind(x1, x2)
   U = runif(n)
   y = rep(0, n)
-  eta = as.vector(x %*% beta.0)
-  mu = mu0 + 2*atan(sin(5*eta)/2)
-  #mu = mu0 + 2*atan(2*eta^2)
-  #mu = mu0 + 2*atan(eta)
+  mu = mu0 + 2*atan(as.vector(f_0(x %*% beta.0)))
   for (i in 1:n){
     if(U[i]< p){
       y[i] = rvm(1, 0, 1000)
@@ -286,8 +287,6 @@ beta_hat = unname(t(sapply(res.1[,5], beta)))           # ZIJP 1
 res1 = cbind(res.1[,1:4], beta_hat, res.1[,-c(1:5)])    # ZIJP 1
 #beta_hat = unname(t(sapply(res.1[,4], beta)))           # ZIvM 1
 #res1 = cbind(res.1[,1:3], beta_hat, res.1[,-c(1:4)])    # ZIvM 1
-
-f_0 = function(t) sin(5*t)/2  # True single-index function
 
 int1_b = function(x.new, x.ref, df = d.f, degree = 2){
   ibs_ref = ibs(x.ref, df = df, degree = degree)
