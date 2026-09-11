@@ -212,6 +212,79 @@ t2-t1
 fit1
 
 
+
+####### LOOCV ########
+
+
+
+int1_b = function(x.new, x.ref, df = d.f, degree = 2){
+  ibs_ref = ibs(x.ref, df = df, degree = degree)
+  ibs_new = predict(ibs_ref, x.new)
+  ibs_0   = predict(ibs_ref, 0)
+  sweep(ibs_new, 2, ibs_0, "-")
+}
+
+
+n.sim = 1e5
+set.seed(1)
+sim = runif(n.sim, 0, 2*pi)
+sim1 = runif(n.sim, 0, 2*pi)
+sim2 = runif(n.sim, 0, 2*pi)
+
+cv_zivm1 = numeric(n)
+
+t1 = Sys.time()
+for(i in 1:n){
+  
+  test.idx = i
+  train.idx = setdiff(1:n, i)
+  
+  # Split predictors and response
+  x.train = x[train.idx, , drop = FALSE]
+  x.test  = x[test.idx, , drop = FALSE]
+  
+  y.train = y[train.idx]
+  y.test  = y[test.idx]
+  
+  fit = zivm1(x.train, y.train)
+  b = fit[4:6]
+  g = fit[-c(1:6)]
+  
+  xp.train = x_pr(b, x.train)
+  xp.test  = x_pr(b, x.test)
+  
+  xp.test = pmin(pmax(xp.test, min(xp.train)),max(xp.train))
+  
+  if(length(unique(round(xp.train, 8))) <= 3){
+    pred4 = NA
+  } else {
+    
+    B_0 = try(int1_b(xp.test, xp.train))
+    if(inherits(B_0, "try-error")){
+      pred4 = NA
+    } else {
+      f_0 = sum(g * B_0[1, ])
+      pred4 = (fit[2] + 2*atan(f_0)) %% (2*pi)
+    }
+}
+  if(all(is.na(pred4))){
+    cv_zivm1[i] = NA
+  } else {
+    crp1 = 2*pi * mean(cdist(sim, y.test) *(fit[1]*CircStats::dvm(sim, 0, 1000) +
+                                              (1-fit[1])*CircStats::dvm(sim, pred4, fit[3])))
+    
+    crp2 = 4*pi^2 * mean(cdist(sim1, sim2) *(fit[1]*(CircStats::dvm(sim1,0,1000)) + (1-fit[1])*(CircStats::dvm(sim1, pred4, fit[3]))) *
+                           (fit[1]*(CircStats::dvm(sim2,0,1000)) + (1-fit[1])*(CircStats::dvm(sim2, pred4, fit[3]))))
+    
+    crp = crp1-0.5*crp2
+    cv_zivm1[i] = mean(crp)
+  }
+}
+t2 = Sys.time()
+t2-t1
+
+
+
 ############################################
 
 
